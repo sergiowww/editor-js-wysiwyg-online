@@ -1,0 +1,24 @@
+#summary Editor WYSIWYG JS
+#labels Phase-Implementation
+
+= Introdução =
+
+Editor online para web em Javascript
+Editor de texto com:
+
+    * negrito
+    * itálico
+    * sublinhado
+    * centralização no centro, esquerda e direita
+    * Escolha da fonte (Arial, Times, Verdana, Courier New, Comic Sans MS)
+    * Tamanho da fonte
+    * Cor da fonte
+    * Cabeçalho e rodapé (para PDF)
+
+Bem simples, na verdade eu desenvolví ele para possibilitar o desenvolvimento de modelos de e-mail e modelos de carta pelo usuário. Nada tão aprimorado.
+Funciona no IE e no Firefox. No IE ele usa a API nativa para execução de comandos e no Firefox é manipulação de objetos mesmo.
+
+
+= Detalhes =
+
+Mais informações e downloads: http://www.wicstech.com.br/artigos/javascript/editor-em-js-wysiwyg/
