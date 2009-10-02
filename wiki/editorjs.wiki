@@ -17,12 +17,15 @@ Features
 
 Very simple and useful editor, it needs to be improved a lot, but it works for basic text-formatting.
 I've developed it for creation of e-mail and letter templates by users, nothing so sophisticated.
-Works on IE (6.0 or >) and Mozilla Firefox. On IE, it uses an native API to apply text-formatting and in Firefox it uses DOM manipulation.
+Works in all browsers. 
 
 
 = Details =
 
 More information and downloads see http://www.wicstech.com.br/artigos/javascript/editor-em-js-wysiwyg/
+
+Online version: http://editor-js-wysiwyg-online.googlecode.com/svn/trunk/index.html
+
 
 Generate PDF from HTML
 http://www.ohloh.net/p/xhtmlrenderer
