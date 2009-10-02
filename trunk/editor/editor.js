@@ -1,6 +1,6 @@
 /**
  * Editor de texto built-in
- * Rev 4718
+ * Rev 5021
  * 
  * @author Sergio
  * 
@@ -21,574 +21,338 @@
  */
 Form.Element.EditAreaObserver = Class.create(Abstract.TimedObserver, {
 	getValue: function() {
-		return this.element.innerHTML;
+		return this.element.body.innerHTML;
 	}
 });
 /**
- * Wrapper para recuperar o texto selecionad
- * FIXME ainda tem alguns bugs no firefox
+ * Wrapper para recuperar o texto selecionado
+ * @class WrapperTextRange
  */
 var WrapperTextRange = Class.create();
 WrapperTextRange.prototype = {
+	
 	/**
-	 * @type Range
+	 * @type HTMLIFrameElement
+	 */
+	iframe: null,
+	/**
+	 * @type HTMLDocument
+	 */
+	iframeDocument: null,
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @type TextRange
 	 */
 	range: null,
 	/**
 	 * @constructor
-	 * @param {HTMLIframeElement} editArea
+	 * @param {TextEditor} textEditor
 	 */
-	initialize: function(editArea){
-		if(Prototype.Browser.IE){
-			this.range = document.selection.createRange();
-		}
-		if(Prototype.Browser.Gecko){
-			this.range = editArea.contentWindow.getSelection();
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+		var editArea = textEditor.getEditArea();
+		this.iframe = editArea;
+		var iframeDocument = this.iframe.contentWindow.document;
+		this.iframeDocument = iframeDocument;
+		if(iframeDocument.selection){
+			this.range = iframeDocument.selection.createRange();  //store to restore later(IE fix)
 		}
 	},
 	/**
-	 * mover para o final
-	 * @param {Number} caracteres
-	 * @return quantidade de caracteres movidos
+	 * Retorna o texto selecionado sem formatação
+	 * @return texto sem formatação
 	 * @type String
 	 */
-	moveEnd: function(caracteres){
-		if(Prototype.Browser.IE){
-			return this.range.moveEnd("character", caracteres);
-		}
-		if(Prototype.Browser.Gecko){
-			var rangeWork = this.getFirefoxRange();
-			rangeWork.setEnd(rangeWork.endOffset+caracteres);
-			return caracteres;
-		}
-		return null;
+	getSelectedText: function(){
+		var iframe_win = this.iframe.contentWindow;
+
+		if(iframe_win.getSelection)	
+			return iframe_win.getSelection().toString();
+
+		this.range.select(); //Restore selection, if IE lost focus.
+		return iframe_win.document.selection.createRange().text;
 	},
 	/**
-	 * @param {Number} caracteres
-	 * @return quantidade de caracteres movidos
-	 * @type Number
-	 */
-	moveStart: function(caracteres){
-		if(Prototype.Browser.IE){
-			return this.range.moveStart("character", caracteres);
-		}
-		if(Prototype.Browser.Gecko){
-			var rangeWork = this.getFirefoxRange();
-			rangeWork.setStart(rangeWork.startOffset+caracteres);
-			return caracteres;
-		}
-		return null;
-	},
-	/**
-	 * @return html do texto selecionado
+	 * Retorna o html selecionado
+	 * @return html da seleção
 	 * @type String
 	 */
-	getText: function(){
-		if(Prototype.Browser.IE){
-			return this.range.text;
-		}
-		if(Prototype.Browser.Gecko){
-			return this.range.toString();
-		}
-		return null;
-	},
-	/**
-	 * recuperar o html do texto selecionado
-	 * @return html do texto selecionado
-	 * @type String
-	 */
-	getHTMLText: function(){
-		if(Prototype.Browser.IE){
-			return this.range.htmlText;
-		}
-		if(Prototype.Browser.Gecko){
-			return Builder.node("div", [this.getFirefoxRange().cloneContents()]).innerHTML;
-		}
-		return null;
-	},
-	/**
-	 * colar um fragmento de texto com html na seleção
-	 * @param {String} html
-	 */
-	setHTMLText: function(html){
-		if(Prototype.Browser.IE){
-			this.range.pasteHTML(html);
-		}
-	},
-	/**
-	 * Aplicar uma tag ao texto selecionado
-	 * Essa só funciona no Gecko
-	 * @param elemento
-	 */
-	surroundContents: function(elemento){
-		if(Prototype.Browser.Gecko){
-			this.getFirefoxRange().surroundContents(elemento);
-		}
-	},
-	/**
-	 * Mover a seleção para o elemento passado
-	 * @param oElement
-	 * @return
-	 */
-	moveToElementText: function(oElement){
-		if(Prototype.Browser.IE){
-			this.range.moveToElementText(oElement);
-		}
-		if(Prototype.Browser.Gecko){
-			this.getFirefoxRange().selectNode(oElement);
-		}
-	},
-	getFirefoxRange: function(){
-		return this.range.getRangeAt(0);
-	},
-	/**
-	 * Recuperar o elemento pai da seleção
-	 * @return o elemento pai da seleção
-	 * @type Node
-	 */
-	parentElement: function(){
-		var parentNode  = null;
-		if(Prototype.Browser.IE){
-			parentNode = this.range.parentElement();
-		}
-		if(Prototype.Browser.Gecko){
-			parentNode = this.getFirefoxRange().commonAncestorContainer.parentNode;
-		}
-		return parentNode;
-	},
-	/**
-	 * Selecionar o texto
-	 * @return
-	 */
-	select: function(){
-		if(Prototype.Browser.IE){
-			this.range.select();
-		}
-	},
-	/**
-	 * Executar um comando na seleção
-	 * @param command
-	 * @return
-	 */
-	execCommand: function(command){
-		if(Prototype.Browser.IE){
-			this.range.execCommand(command);
-		}
-	},
-	/**
-	 * Remover a formatação do texto selecionado
-	 */
-	removerFormatacao: function(){
-		if(Prototype.Browser.IE){
-			if(this.getHTMLText().blank()){
-				return;
-			}
-			this.execCommand("RemoveFormat");
-		}
-		if(Prototype.Browser.Gecko){
-			var textoSuper = this.getFirefoxRange().commonAncestorContainer;
-			var elementoSuper = textoSuper.parentNode;
-			if(elementoSuper.nodeName.toLowerCase() != "body" && Node.TEXT_NODE == textoSuper.nodeType){
-				elementoSuper.parentNode.replaceChild(textoSuper, elementoSuper);
+	getSelectedHTML: function(){
+		var html = null;
+		var iframe_window = this.iframe.contentWindow;
+		var rng	= this.getSelectionRange();
+
+		if(rng) {
+			if(iframe_window.getSelection) {
+				var e = document.createElement('div');
+				e.appendChild(rng.cloneContents());
+				html = e.innerHTML;		
+			} else {
+				html = rng.htmlText;
 			}
 		}
+
+		return html;	
 	},
 	/**
-	 * Apagar o texto selecionado
+	 * 
+	 * @return o elemento selecionado
+	 * @type HTMLElement
+	 */
+	getSelectedElement: function(){
+		var node, selection, range;
+		var iframe_win	= this.iframe.contentWindow;
+		
+		if (iframe_win.getSelection) {
+			try {
+				selection = iframe_win.getSelection();
+				range = selection.getRangeAt(0);
+				node = range.commonAncestorContainer;
+			} catch(e){
+				return false;
+			}
+		} else {
+			try {
+				selection = iframe_win.document.selection;
+				range = selection.createRange();
+				node = range.parentElement();
+			} catch (e) {
+				return false;
+			}
+		}
+
+		return node;	
+	},
+	/**
+	 * retorna o objeto range que representa a seleção
+	 * @return o objeto range de acordo com o navegador
+	 * @type Object
+	 */
+	getSelectionRange: function(){
+		var rng	= null;
+		var iframe_window = this.iframe.contentWindow;
+		this.iframe.focus();
+		
+		if(iframe_window.getSelection) {
+			rng = iframe_window.getSelection().getRangeAt(0);
+			if(Prototype.Browser.Opera) { //v9.63 tested only
+				var s = rng.startContainer;
+				if(s.nodeType === Node.TEXT_NODE){
+					rng.setStartBefore(s.parentNode);
+				}
+			}
+		} else {
+			this.range.select(); //Restore selection, if IE lost focus.
+			rng = this.iframeDocument.selection.createRange();
+		}
+
+		return rng;
+	},
+	/**
+	 * Apaga o texto selecionado
 	 * @return
 	 */
 	apagarTexto: function(){
-		if(Prototype.Browser.IE){
-			this.setHTMLText("");
-		}
-		if(Prototype.Browser.Gecko){
-			var rangeWork = this.getFirefoxRange();
-			rangeWork.deleteContents();
+		this.selectionReplaceWith("");
+	},
+	/**
+	 * Substitui o texto selecionado pelo html passado
+	 * @param {String} html
+	 * @return
+	 */
+	selectionReplaceWith: function(html){
+		var rng	= this.getSelectionRange();
+		var iframe_window = this.iframe.contentWindow;
+
+		if(!rng)
+			return;
+		this.textEditorInstance.executarComando("removeFormat");// we must remove formating or we will get empty format tags!
+		
+
+		if(iframe_window.getSelection) {
+			rng.deleteContents();
+			rng.insertNode(rng.createContextualFragment(html));
+			this.textEditorInstance.executarComando("delete");
+		} else {
+			this.textEditorInstance.executarComando("delete");
+			rng.pasteHTML(html);
 		}
 	}
 };
-
 /**
- * Classe principal
+ * @class UtilTextEditor
  */
-var TextEditor = Class.create();
-TextEditor.prototype = {
-	basePath: null,
+var UtilTextEditor = {
 	/**
-	 * id do elemento que representa a editArea
+	 * Estilo dos botões do texteditor
 	 * @type String
 	 */
-	idEditArea: "editAreaElement",
+	ESTILO_BOTOES: "border: 1px solid rgb(144, 186, 237); width: 100px; background-color: #ECF6FF;font-weight: bold; color:#7A7A7A; cursor:pointer;",
 	/**
-	 * área editável (onde o usuário irá utilizar sua imaginação ) que
-	 * pode ser uma div se for IE ou um iframe se o browser for o Firefox
-	 * @type HTMLElement  
-	 */
-	editArea: null,
-	/**
-	 * Onde o text editor foi criado
+	 * @param {String} titulo
+	 * @param {Number} height
+	 * @param {Number} width
+	 * @param {Function} functionConfirm
+	 * @param {Function} functionCancel
+	 * @param {TextEditor} textEditor
+	 * 
+	 * @return div que representará o conteúdo que será adicionado pela função chamadora
 	 * @type HTMLDivElement
 	 */
-	divContainer: null,
+	getJanelaPadrao: function(titulo, height, width, functionConfirm, functionCancel, textEditor){
+		var divContainer = textEditor.divContainer;
+		/**
+		 * @type HTMLInputElement
+		 */
+		var botaoConfirm = Builder.node("input", {
+			type: "button", 
+			value: "OK", 
+			id:"ok", 
+			title: "Confirmar ação", 
+			style: this.ESTILO_BOTOES
+		});
+		/**
+		 * @type HTMLInputElement
+		 */
+		var botaoCancel = Builder.node("input", {
+			type: "button", 
+			value: "Cancelar", 
+			id: "cancelar", 
+			title: "Cancelar ação", 
+			style: this.ESTILO_BOTOES
+		});
+		Event.observe(botaoConfirm, "click", functionConfirm);
+		Event.observe(botaoCancel, "click", functionCancel);
+		
+		var divTitulo = this.getDivTitulo(titulo);
+		/**
+		 * @type HTMLDivElement
+		 */
+		var div = Builder.node("div", {style: "position: absolute;" +
+												"top:40px; " +
+												"left: 10px; " +
+												"width: "+width+"px; " +
+												"border: 1px solid #808080; " +
+												"background-color: #FBFDFF; " +
+												"padding: 2px;", id: "divJanela"});
+		var divConteudo = $(Builder.node("div", {style: "background-color: white;border: 1px solid #808080; padding: 5px;margin: 3px;"}));
+		div.appendChild(divTitulo);
+		div.appendChild(divConteudo);
+		div.setOpacity(0.9);
+		div.appendChild(Builder.node("div", {style: "text-align: center;"}, [
+			botaoConfirm,
+			document.createTextNode(" "),
+			botaoCancel
+		]));
+		divContainer.appendChild(div);
+		divContainer.makePositioned();
+		return divConteudo;
+	},
 	/**
-	 * barra de ferramentas
+	 * Arrastador
+	 * @type Draggable
+	 */
+	draggable: null,
+	/**
+	 * Buscar pelo div principal, pois que deverá ser arrastado
+	 * @param {HTMLSpanElement} elementoInicial
+	 * @return
+	 */
+	getDivCampo: function(elementoInicial){
+		while(!(elementoInicial.id == "divJanela")){
+			elementoInicial = elementoInicial.parentNode;
+		}
+		return elementoInicial;
+	},
+	/**
+	 * Iniciar evento de arrastar janelinha
+	 * @param {Event} event
+	 * @return
+	 */
+	iniciarDrag: function(event){
+		if(this.draggable == null){
+			var element = event.element();
+			element.setStyle({cursor: "move"});
+			var divPrincipal = this.getDivCampo(element);
+			this.draggable = new Draggable(divPrincipal);
+			this.draggable.initDrag(event);
+		}
+	},
+	/**
+	 * Finalizar arrasto da janela
+	 * @param {Event} event
+	 * @return
+	 */
+	finalizarDrag: function(event){
+		var element = event.element();
+		var divPrincipal = this.getDivCampo(element);
+		
+		element.setStyle({cursor: "default"});
+		if(this.draggable != null){
+			try{
+				this.draggable.finishDrag(event);
+			}catch (e) {
+				//nothing
+			}
+			this.draggable.destroy();
+			this.draggable = null;
+		}
+	},
+	/**
+	 * Cria o span de título
+	 * @param {String} titulo
+	 * @return span criado e configurado
+	 * @type HTMLSpanElement
+	 */
+	getSpanTitulo: function(titulo){
+		var spanTituloReal=Builder.node("span", {UNSELECTABLE: "on", style: "cursor: default; padding-bottom: 4px; padding-top:1px;"}, 
+			[document.createTextNode(titulo)]
+		);
+		return spanTituloReal;
+	},
+	/**
+	 * Retorna a div de título da janela
+	 * @param {String} titulo
+	 * @return div criado
 	 * @type HTMLDivElement
 	 */
-	barraFerramentas: null,
-	/**
-	 * Tags que deverão ser sempre removidas do texto
-	 * @type Array
-	 */
-	forbiddenTags: null,
-	/**
-	 * Adicionar uma tag não permitida (que deverá ser removida toda vez que aparecer no texto)
-	 * @param {String} tag
-	 * @return
-	 */
-	addNotAllowedTag: function(tag){
-		 if(this.forbiddenTags == null){
-			 this.forbiddenTags = new Array();
-			 this.setListenerEditArea(this.removeTags.bind(this));
-		 }
-		 this.forbiddenTags.push(tag);
-	},
-	/**
-	 * Função que limpará o texto de tempos em tempos
-	 * @param {HTMLElement} elemento
-	 * @param {String} valor
-	 * @return
-	 */
-	removeTags: function(elemento, valor){
-		this.forbiddenTags.each((function(tag){
-			this.removerTag(elemento, tag);
-		}).bind(this));
-	},
-	/**
-	 * Remover tags do texto, sem remover o conteúdo das mesmas
-	 * @param {HTMLElement} elementoPai
-	 * @param {String} tag
-	 * @return
-	 */
-	removerTag: function(elementoPai, tag){
-		 var dls = $A(elementoPai.getElementsByTagName(tag));
-			
-		 dls.each(function(dl){
-			 var appendNode = dl.parentNode;
-			 var filhos = $A(dl.childNodes);
-			 for ( var index = 0; index < filhos.length; index++) {
-				 var node = filhos[index];
-				 node.parentNode.removeChild(node);
-				 
-				 if(index == 0){
-					 appendNode.replaceChild(node, dl);
-					 appendNode = node;
-				 }else{
-					 Element._insertionTranslations.after(appendNode, node);
-				 }
-			 }
-		});
-	},
-	/**
-	 * recuperar o diretório onde o editor.js está para poder carregar os recursos utilizados
-	 * pelo componente (como imagens dos botões e etc.)
-	 * @return o diretório base onde o text-editor está instalado no webapp 
-	 * @type String
-	 */
-	getBasePath: function(){
-		if(this.basePath == null){
-			$A(document.getElementsByTagName("script")).findAll( (function(s) {
-				if(s.src.indexOf("editor.js") != -1){
-					var src = s.src;
-					this.basePath = src.substring(0, src.indexOf("editor.js"));
-					throw $break;
-				}
-			}).bind(this));			
-		}
-		return this.basePath;
-	},
-	/**
-	 * @constructor
-	 * 
-	 * @param {HTMLDivElement} divContainer elemento onde o text editor deverá ser criado
-	 */
-	initialize: function(divContainer){
-		this.forbiddenTags = null;
-		this.divContainer = $(divContainer);
+	getDivTitulo: function(titulo){
+		var divTitulo = Builder.node("div", {style: "cursor:default; " +
+													"font-weight: bold;" +
+													"color: #003366;" +
+													"height: 17px; " +
+													"font-size: 11px;" +
+													"background-color: #dde8f3;" +
+													"padding-left:5px;"});
 		
-		var larguraDivContainer = this.divContainer.getWidth();
-		var alturaDivContainer = this.divContainer.getHeight();
+		var spanTituloReal = this.getSpanTitulo(titulo); 
 		
-		$(this.divContainer).setStyle({
-			fontFamily: "Arial",
-			border: "1px solid gray",
-			backgroundColor: "white"
-		});
-		this.configurarBarraFerramentas();
-		if(Prototype.Browser.IE){
-			this.editArea = Builder.node("div", {style: "padding-left: 7px;", id: this.idEditArea});
-			/* ocorre um bug aqui pro IE7/8 não sei quando começou isso mas esse bug não existia
-			 * o objeto mesmo estando na tela com uma algura e uma largura definida no estilo
-			 * ele não possui dimensões (todas as propriedades de dimensões apresentam 0), esse código 
-			 * é acionado de um evento onload do objeto window, o que significa que os objetos que estão na tela
-			 * não foram totalmente carregados.
-			 * Investiguei o problema e essa foi a melhor solução recuperar a altura/largura do estilo se 
-			 * as dimensões reais estiverem zeradas.
-			 * */
-			if(larguraDivContainer == 0){
-				larguraDivContainer = this.divContainer.style.pixelWidth;
-			}
-			if(alturaDivContainer == 0){
-				alturaDivContainer = this.divContainer.style.pixelHeight;
-			}
-			this.editArea.contentEditable = true;
-			$(this.editArea).setStyle({
-				clear: "both",
-				overflow: "auto",
-				height: (alturaDivContainer-29 )+"px",
-				width: (larguraDivContainer-11)+ "px"
-			});
-			this.divContainer.appendChild(this.editArea);
-		}else if(Prototype.Browser.Gecko){
-			var iframe = Builder.node("iframe", {frameBorder: "no", scrolling: "no", width: "100%", height: "100%", id: this.idEditArea});
-			this.editArea = iframe;
-			this.divContainer.appendChild(this.editArea);
-			
-			new PeriodicalExecuter((function(pe){
-				this.editArea.contentWindow.document.designMode = "on";
-				try {
-					this.editArea.contentWindow.document.execCommand("undo", false, null);
-				} catch (e) {
-					alert("This demo is not supported on your level of Mozilla.");
-				}
-				$(this.editArea).setStyle({
-					overflow: "auto",
-					height: (alturaDivContainer-29 )+"px",
-					width: (larguraDivContainer-3)+ "px"
-				});
-				pe.stop();
-				this.setHTML(this.html);
-				this.editArea.focus();
-			}).bind(this), 0.1);
-		}else{
-			alert("Não há suporte para o seu browser =(");
-			return;
-		}
-		this.editArea.id = "editArea";
-		this.editArea.focus();
-	},
-	/**
-	 * 
-	 * Se firefox retorna {HTMLBodyElement}
-	 * Se IE retorna {HTMLDivElement}
-	 * 
-	 * IMPORTANTE: Observe que o prototype não extend o body, então ele não tem os 
-	 * métodos que os elementos extendidos tem
-	 *  
-	 * @return Retorna a área de edição do do TextEditor
-	 * @type HTMLElement
-	 */
-	getEditArea: function(){
-		if(Prototype.Browser.IE){
-			return this.editArea;
-		}
-		if(Prototype.Browser.Gecko){
-			return this.editArea.contentDocument.body;
-		}
 		
-		return null;
-	},
-	/**
-	 * @type Form.Element.EditAreaObserver
-	 */
-	editAreaObserver: null,
-	/**
-	 * setar um listener para observar sempre que houver alteração no texto do editor
-	 * @param {Function} callback
-	 */
-	setListenerEditArea: function(callback){
-	 	new PeriodicalExecuter((function(pe){
-			var editArea = this.getEditArea();
-			if(this.editAreaObserver == null){
-				this.editAreaObserver = new Form.Element.EditAreaObserver(editArea, 0.1, callback);
-			}else{
-				this.editAreaObserver.stop();
-				this.editAreaObserver = new Form.Element.EditAreaObserver(editArea, 0.1, callback);
-			}
-			if(callback == null){
-				this.editAreaObserver.stop();
-				this.editAreaObserver = null;
-			}
-			pe.stop();
-		}).bind(this), 0.2);
-	},
-	
-	/**
-	 * Construir a barra de ferramentas
-	 */
-	configurarBarraFerramentas: function(){
-		this.barraFerramentas = Builder.node("div", {style: "padding-left:4px; margin-top: 3px; border-bottom: solid 1px #E9E9E9; height: 22px; background-color: #FBFDFF"});
-		this.toolNormal();
-		this.toolBold();
-		this.toolItalics();
-		this.toolUnderline();
-		this.toolAlignLeft();
-		this.toolAlignCenter();
-		this.toolAlignRight();
-		this.toolJustify();
-		this.toolAlignBottom();
-		this.toolAlignTop();
-		this.toolFormatacao();
-		this.toolTamanhoFonte();
-		this.toolColor();
-		this.toolEditHTML();
-		this.divContainer.appendChild(this.barraFerramentas);
-	},
-	/**
-	 * Construir botão para remover formatação do texto selecionado
-	 */
-	toolNormal: function(){
-		var img = this.getImageToolBar("text_normal.png");
-		var titulo = "Retirar a formatação do texto selecionado";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarNormal.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * remover qualquer formatação do texto selecionado
-	 */
-	aplicarNormal: function(){
-		var range = new WrapperTextRange(this.editArea);
-		range.removerFormatacao();
-	},
-	/**
-	 * Construir botão para aplicar negrito ao texto selecionado
-	 */
-	toolBold: function(){
-		var img = this.getImageToolBar("text_bold.png");
-		var titulo = "Negrito";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarBold.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * aplicar negrito ao texto selecionado
-	 */
-	aplicarBold: function(){
-		this.aplicarTagTextoSelecionado("b");
-		this.executarComandoIE("Bold");
-	},
-	/**
-	 * Construir botão para aplicar estilo itálico ao texto selecionado
-	 */
-	toolItalics: function(){
-		var img = this.getImageToolBar("text_italics.png");
-		var titulo = "Texto em itálico";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarItalics.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * aplicar estilo itálico ao texto selecionado
-	 */
-	aplicarItalics: function(){
-		this.aplicarTagTextoSelecionado("i");
-		this.executarComandoIE("Italic");
-	},
-	/**
-	 * Construir botão para sublinhar o texto selecionado
-	 */
-	toolUnderline: function(){
-		var img = this.getImageToolBar("text_underlined.png");
-		var titulo = "Sublinhar o texto";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarUnderline.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * sublinhar o texto selecionado
-	 */
-	aplicarUnderline: function(){
-		this.aplicarTagTextoSelecionado("u");
-		this.executarComandoIE("Underline");
-	},
-	/**
-	 * Construir botão para alinhar o texto selecionado a esquerda
-	 */
-	toolAlignLeft: function(){
-		var img = this.getImageToolBar("text_align_left.png");
-		var titulo = "Alinhar a esquerda";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarAlignLeft.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * alinhar o texto selecionado a esquerda
-	 */
-	aplicarAlignLeft:function(){
-		this.aplicarTagTextoSelecionado("div", "style=\"text-align: left;\"");
-		this.executarComandoIE("JustifyLeft");
-	},
-	/**
-	 * Construir botão para alinhar o texto selecionado no centro
-	 */
-	toolAlignCenter: function(){
-		var img = this.getImageToolBar("text_align_center.png");
-		var titulo = "Alinhar no centro";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarAlignCenter.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * Alinhar o texto selecionado no centro
-	 */
-	aplicarAlignCenter:function(){
-		this.aplicarTagTextoSelecionado("div", "style=\"text-align: center;\"");
-		this.executarComandoIE("JustifyCenter");
-	},
-	/**
-	 * Construir botão para alinhar a direita o texto selecionado
-	 */
-	toolAlignRight: function(){
-		var img = this.getImageToolBar("text_align_right.png");
-		var titulo = "Alinhar a direita";
-		img.title = titulo;
-		img.alt = titulo;
-		Event.observe(img, "click", this.aplicarAlignRight.bind(this));
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * alinhar o texto selecionado a direita
-	 */
-	aplicarAlignRight: function(){
-		this.aplicarTagTextoSelecionado("div", "style=\"text-align: right;\"");
-		this.executarComandoIE("JustifyRight");
-	},
-	/**
-	 * Ferramenta para tornar uma parte do texto como cabeçalho fixo do documento quando impresso 
-	 */
-	toolAlignTop: function(){
-		var img = this.getImageToolBar("layout_north.png");
-		Event.observe(img, "click", this.aplicarAlignTop.bind(this));
-		var titulo = "Colocar o texto selecionado no cabeçalho de todas as páginas (somente para impressão de PDF)";
-		img.title = titulo;
-		img.alt = titulo;
-		this.barraFerramentas.appendChild(img);
+		divTitulo.appendChild(Builder.node("div", {style: "float:left; margin-right: 7px;"}, [
+			spanTituloReal
+		]));
+
+		divTitulo.onselectstart = function(){
+			return false;
+		};
+		Event.observe(divTitulo, "mousedown", this.iniciarDrag.bindAsEventListener(this));
+		Event.observe(divTitulo, "mouseup", this.finalizarDrag.bindAsEventListener(this));
+
+		return divTitulo;
 	},
 	/**
 	 * @type Template
 	 */
-	templateSessoes: new Template("overflow: hidden; height: 90px; border: 1px solid blue;background-position: center center; background-repeat: no-repeat; background-image: url(\"#{imagem}\");"),
-	/**
-	 * Cabeçalho do documento
-	 * @type HTMLDivElement
-	 */
-	header: null,
+	templateSessoes: new Template("overflow: auto; " +
+									"height: 90px; " +
+									"border: 1px solid blue;" +
+									"background-attachment: scroll;" +
+									"background-position: center center; " +
+									"background-repeat: no-repeat; " +
+									"background-image: url(\"#{imagem}\");"),
 	/**
 	 * Estilo das sessões
 	 * @param {String}imagem
@@ -596,181 +360,86 @@ TextEditor.prototype = {
 	 * @type String
 	 */
 	getEstiloSessao: function(imagem){
-		var src = this.getBasePathImagens(imagem);
+		var src = imagem;
 		return this.templateSessoes.evaluate({imagem: src});
-	},
+	}
+};
+/**
+ * @class ToolTamanhoFonte
+ */
+var ToolTamanhoFonte = Class.create();
+ToolTamanhoFonte.prototype = {
 	/**
-	 * colocar o texto selecionado no cabeçalho do documento 
+	 * @type TextEditor
 	 */
-	aplicarAlignTop: function(){
-		var range = new WrapperTextRange(this.editArea);
-		var naoEncontrado = range.getHTMLText();
-		if(naoEncontrado.blank()){
-			return;
-		}
-		range.apagarTexto();
-		var headerID = "header";
-		this.header = this.getElementByIdEditArea(headerID);
-		if(this.header == null){
-			this.header = Builder.node("div", {style: this.getEstiloSessao("header.png"), title: "Cabeçalho do texto",id: headerID});
-		}
-		var firstChild = this.getEditArea().firstChild;
-		if(firstChild == null){
-			this.getEditArea().appendChild(this.header);
-		}else{
-			Element.insert(firstChild, {before: this.header});
-		}
-		this.header.innerHTML = this.header.innerHTML+naoEncontrado;
-	},
+	textEditorInstance: null,
 	/**
+	 * @constructor
 	 * 
-	 * @param {String} id
-	 * @return recupera um elemento de dentro da EditArea
-	 * @type HTMLElement
+	 * @param {TextEditor} textEditor
+	 * @return
 	 */
-	getElementByIdEditArea: function(id){
-		if(Prototype.Browser.Gecko){
-			return this.getEditArea().ownerDocument.getElementById(id);
-		}
-		if(Prototype.Browser.IE){
-			var ids = this.getEditArea().select("[id=\""+id+"\"]");
-			if(ids.length != 0){
-				return ids[0];
-			}
-		}
-		return null;
-	},
-	/**
-	 * Ferramenta para alinhar os elementos selecionados no fundo da página
-	 * Para os modelos de carta
-	 */
-	toolAlignBottom: function(){
-		var img = this.getImageToolBar("layout_south.png");
-		Event.observe(img, "click", this.aplicarAlignBottom.bind(this));
-		var titulo = "Colocar o texto selecionado no rodapé de todas as páginas (somente para impressão de PDF)";
-		img.title = titulo;
-		img.alt = titulo;
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * Rodapé do documento
-	 * @type HTMLDivElement
-	 */
-	footer: null,
-	/**
-	 * jogar o texto selcionado para o rodapé
-	 */
-	aplicarAlignBottom: function(){
-		var range = new WrapperTextRange(this.editArea);
-		var naoEncontrado = range.getHTMLText();
-		if(naoEncontrado.blank()){
-			return;
-		}
-		range.apagarTexto();
-		var footerId = "footer";
-		this.footer = this.getElementByIdEditArea(footerId);
-		if(this.footer == null){
-			this.footer = Builder.node("div", {style: this.getEstiloSessao("footer.png"), title: "Rodapé do texto", id: footerId});
-		}
-		this.getEditArea().appendChild(this.footer);
-		this.footer.innerHTML = this.footer.innerHTML+naoEncontrado;
-	},
-	/**
-	 * Construir botão para justificar o texto selecionado
-	 */
-	toolJustify: function(){
-		var img = this.getImageToolBar("text_align_justified.png");
-		Event.observe(img, "click", this.aplicarJustify.bind(this));
-		var titulo = "Justiticar texto";
-		img.title = titulo;
-		img.alt = titulo;
-		this.barraFerramentas.appendChild(img);
-	},
-	/**
-	 * Aplicar alinhamento justificado ao texto selecionado
-	 */
-	aplicarJustify: function(){
-		this.aplicarTagTextoSelecionado("div", "style=\"text-align: justify;\"");
-	},
-	/**
-	 * Construir o combo para seleção de um novo formato de fonte para aplicar ao texto selecionado
-	 */
-	toolFormatacao: function(){
-		var select = Builder.node("select", {title: "Tipo da fonte do texto selecionado", style: "height: 15px; margin-left: 5px; font-size: 8px;"}, [
-			Builder.node("option", {value: "Arial"}, [document.createTextNode("Arial")]),
-			Builder.node("option", {value: "Verdana"}, [document.createTextNode("Verdana")]),
-			Builder.node("option", {value: "Times New Roman"}, [document.createTextNode("Times New Roman")]),
-			Builder.node("option", {value: "Courier New"}, [document.createTextNode("Courier New")]),
-			Builder.node("option", {value: "Comic Sans MS"}, [document.createTextNode("Comic Sans MS")])
-		]);
-		Event.observe(select, "change", this.aplicarFormatacao.bindAsEventListener(this));
-		this.barraFerramentas.appendChild(this.getDivFerramentas(select));
-		select.selectedIndex = 2;
-	},
-	/**
-	 * aplicar novo formato de fonte ao texto selecionado
-	 * @param {Event} event
-	 */
-	aplicarFormatacao: function(event){
-		var select = Event.element(event);
-		var fonte = $(select).getValue();
-		this.aplicarTagTextoSelecionado("span", "style=\"font-family: "+fonte+"\"");
-		this.executarComandoIE("FontName", fonte);
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
 	},
 	/**
 	 * Construir combo para seleção de um novo tamanho para aplicar ao texto selecionado
+	 * @return o select com as opções de tamanho de fonte
+	 * @type HTMLSelectElement
 	 */
-	toolTamanhoFonte: function(){
+	getElementoTela: function(){
 		var opcoes = new Array();
-		if(Prototype.Browser.Gecko){
-			opcoes.push(Builder.node("option", {value: "8px"}, [document.createTextNode("8")]));
-			opcoes.push(Builder.node("option", {value: "10px"}, [document.createTextNode("10")]));
-			opcoes.push(Builder.node("option", {value: "12px", selected: "selected"}, [document.createTextNode("12")]));
-			opcoes.push(Builder.node("option", {value: "14px"}, [document.createTextNode("14")]));
-			opcoes.push(Builder.node("option", {value: "16px"}, [document.createTextNode("16")]));
-			opcoes.push(Builder.node("option", {value: "18px"}, [document.createTextNode("18")]));
-			opcoes.push(Builder.node("option", {value: "20px"}, [document.createTextNode("20")]));
-			opcoes.push(Builder.node("option", {value: "22px"}, [document.createTextNode("22")]));
-			opcoes.push(Builder.node("option", {value: "24px"}, [document.createTextNode("24")]));
-			opcoes.push(Builder.node("option", {value: "26px"}, [document.createTextNode("26")]));
-			opcoes.push(Builder.node("option", {value: "28px"}, [document.createTextNode("28")]));
-			opcoes.push(Builder.node("option", {value: "30px"}, [document.createTextNode("30")]));
-			opcoes.push(Builder.node("option", {value: "32px"}, [document.createTextNode("32")]));
-			opcoes.push(Builder.node("option", {value: "34px"}, [document.createTextNode("34")]));
-			opcoes.push(Builder.node("option", {value: "36px"}, [document.createTextNode("36")]));
-			opcoes.push(Builder.node("option", {value: "38px"}, [document.createTextNode("38")]));
-			opcoes.push(Builder.node("option", {value: "40px"}, [document.createTextNode("40")]));
-			opcoes.push(Builder.node("option", {value: "42px"}, [document.createTextNode("42")]));
-		}
-		if(Prototype.Browser.IE){
-			opcoes.push(Builder.node("option", {value: "1", selected: "selected"}, [document.createTextNode("1")]));
-			opcoes.push(Builder.node("option", {value: "2"}, [document.createTextNode("2")]));
-			opcoes.push(Builder.node("option", {value: "3"}, [document.createTextNode("3")]));
-			opcoes.push(Builder.node("option", {value: "4"}, [document.createTextNode("4")]));
-			opcoes.push(Builder.node("option", {value: "5"}, [document.createTextNode("5")]));
-			opcoes.push(Builder.node("option", {value: "6"}, [document.createTextNode("6")]));
-			opcoes.push(Builder.node("option", {value: "7"}, [document.createTextNode("7")]));
-		}
+		opcoes.push(Builder.node("option", {value: ""}, [document.createTextNode("- tamanho -")]));
+		opcoes.push(Builder.node("option", {value: "1"}, [document.createTextNode("1 (8pt)")]));
+		opcoes.push(Builder.node("option", {value: "2"}, [document.createTextNode("2 (10pt)")]));
+		opcoes.push(Builder.node("option", {value: "3", selected: "selected"}, [document.createTextNode("3 (12pt)")]));
+		opcoes.push(Builder.node("option", {value: "4"}, [document.createTextNode("4 (14pt)")]));
+		opcoes.push(Builder.node("option", {value: "5"}, [document.createTextNode("5 (16pt)")]));
+		opcoes.push(Builder.node("option", {value: "6"}, [document.createTextNode("6 (18pt)")]));
+		opcoes.push(Builder.node("option", {value: "7"}, [document.createTextNode("7 (20pt)")]));
 		
-		
+		/**
+		 * @type HTMLSelectElement
+		 */
 		var select = Builder.node("select", {title: "Tamanho do texto selecionado", style: "height: 15px; margin-left: 5px; font-size: 8px;"}, opcoes);
-		Event.observe(select, "change", this.aplicarTamanhoFonte.bindAsEventListener(this));
-		this.barraFerramentas.appendChild(this.getDivFerramentas(select));
+		select.selectedIndex = 3;
+		Event.observe(select, "change", this.aplicarFormatacao.bindAsEventListener(this));
+		return select;
 	},
 	/**
 	 * Aplicar um novo tamanho ao texto selecionado
 	 * @param {Event} event
 	 */
-	aplicarTamanhoFonte: function(event){
+	aplicarFormatacao: function(event){
 		var select = Event.element(event);
 		var tamanho = $(select).getValue();
-		this.aplicarTagTextoSelecionado("span", "style=\"font-size: "+tamanho+"\"");
-		this.executarComandoIE("FontSize", parseInt(tamanho));
+		this.textEditorInstance.executarComando("fontsize", parseInt(tamanho));
+	}
+};
+/**
+ * @class ToolColor
+ */
+var ToolColor = Class.create();
+ToolColor.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
 	},
 	/**
 	 * Gerar combo para trocar a cor do texto selecionado
+	 * @return botao
+	 * @type HTMLDivElement
 	 */
-	toolColor: function(){
+	getElementoTela: function(){
 		var resto = "height: 10px;width:10px; float:left; border: solid 1px black; margin: 2px; cursor: pointer; ";
 		var titulo = new Template("Mudar a cor do texto selecionado para #{c}");
 		var cores = new Array();
@@ -822,14 +491,16 @@ TextEditor.prototype = {
 			divColors.push(Builder.node("div", {style: estilo, UNSELECTABLE: "on", title: titulo.evaluate({c: cor})}, [document.createTextNode(" ")]));
 		});
 		var estiloDivCor = "position:absolute; width: 128px; margin-left: 10px; float: left;display:none; background-color:#F3F3F3; border: 1px solid gray; padding: 3px;";
+		/**
+		 * @type HTMLDivElement
+		 */
 		var divCor = Builder.node("div", {style: estiloDivCor}, divColors);
 		$(divCor).childElements().each((function(div){
-			Event.observe(div, "click", this.aplicarColor.bindAsEventListener(this));
+			Event.observe(div, "click", this.aplicarFormatacao.bindAsEventListener(this));
 		}).bind(this));
+		this.textEditorInstance.barraFerramentas.appendChild(divCor);
 		
-		this.barraFerramentas.appendChild(divCor);
-		
-		var imagem = this.getImageToolBar("fontcolor.gif");
+		var imagem = this.textEditorInstance.getImageToolBar("fontcolor.gif");
 		Event.observe(imagem, "click", this.mostrarCores.bind(this, divCor));
 		var tituloBotao = "cor do texto";
 		imagem.alt = tituloBotao;
@@ -838,12 +509,22 @@ TextEditor.prototype = {
 		imagem.firstChild.width = "21";
 		
 		
-		this.barraFerramentas.appendChild(imagem);
 		new PeriodicalExecuter(function(pe){
 			divCor.style.marginTop = "16px";
 			divCor.style.left = (Prototype.Browser.IE? (imagem.offsetLeft+2): (imagem.offsetLeft-11))+ "px";
 			pe.stop();
 		}, 1.0);
+		return imagem;
+	},
+	/**
+	 * Aplicar uma cor ao texto selecionado
+	 * @param {Event} event
+	 */
+	aplicarFormatacao: function(event){
+		var div = Event.element(event);
+		var cor = div.style.backgroundColor;
+		this.textEditorInstance.executarComando("foreColor", cor);
+		this.mostrarCores();
 	},
 	/**
 	 * Div container das cores
@@ -860,94 +541,291 @@ TextEditor.prototype = {
 		}
 		divCor.toggle();
 		this.divCor = divCor;
+	}
+};
+/**
+ * @class ToolFormatacao
+ */
+var ToolFormatacao = Class.create();
+ToolFormatacao.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
 	},
 	/**
-	 * gerar botão para edição do HTML gerado pelo editor principal
+	 * Construir o combo para seleção de um novo formato de fonte para aplicar ao texto selecionado
+	 * @return o select criado para escolher a fonte
+	 * @type HTMLSelectElement
 	 */
-	toolEditHTML: function(){
-		var image = this.getImageToolBar("text-html.png");
-		Event.observe(image, "click", this.aplicarEditHTML.bind(this));
-		var titulo = "Visualizar o código HTML do texto";
-		image.alt = titulo;
-		image.title = titulo;
-		if(Prototype.Browser.Gecko){
-			$(image).setStyle({cssFloat: "right"});
-		}
-		if(Prototype.Browser.IE){
-			$(image).setStyle({styleFloat: "right"});
-		}
-		this.barraFerramentas.appendChild(image);
+	getElementoTela: function(){
+		/**
+		 * @type HTMLSelectElement
+		 */
+		var select = Builder.node("select", {title: "Tipo da fonte do texto selecionado", style: "height: 15px; margin-left: 5px; font-size: 8px;"}, [
+			Builder.node("option", {value: ""}, [document.createTextNode("- fonte -")]),
+			Builder.node("option", {value: "Arial"}, [document.createTextNode("Arial")]),
+			Builder.node("option", {value: "Verdana"}, [document.createTextNode("Verdana")]),
+			Builder.node("option", {value: "Times New Roman", selected: "selected"}, [document.createTextNode("Times New Roman")]),
+			Builder.node("option", {value: "Courier New"}, [document.createTextNode("Courier New")]),
+			Builder.node("option", {value: "Comic Sans MS"}, [document.createTextNode("Comic Sans MS")]),
+			Builder.node("option", {value: "georgia"}, [document.createTextNode("Georgia")]),
+			Builder.node("option", {value: "impact"}, [document.createTextNode("Impact")]),
+			Builder.node("option", {value: "trebuchet ms"}, [document.createTextNode("Trebuchet MS")]),
+			Builder.node("option", {value: "helvetica"}, [document.createTextNode("Helvetica")])
+		]);
+		select.selectedIndex = 3;
+		Event.observe(select, "change", this.aplicarFormatacao.bindAsEventListener(this));
+		return select;
 	},
 	/**
-	 * Janela de editar HTML sendo arrastada
-	 * @type Draggable
+	 * aplicar novo formato de fonte ao texto selecionado
+	 * @param {Event} event
 	 */
-	janelaSendoArrastada: null,
+	aplicarFormatacao: function(event){
+		var select = Event.element(event);
+		var fonte = $(select).getValue();
+		if(!fonte.blank()){
+			this.textEditorInstance.executarComando("fontname", fonte);
+		}
+	}
+};
+/**
+ * @class ToolAlignBottom
+ */
+var ToolAlignBottom = Class.create();
+ToolAlignBottom.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * Rodapé do documento
+	 * @type HTMLDivElement
+	 */
+	footer: null,
+	/**
+	 * jogar o texto selcionado para o rodapé
+	 */
+	aplicarFormatacao: function(){
+		var range = new WrapperTextRange(this.textEditorInstance);
+		var naoEncontrado = range.getSelectedHTML();
+		if(naoEncontrado.blank()){
+			return;
+		}
+		range.apagarTexto();
+		var footerId = "footer";
+		this.footer = this.textEditorInstance.getElementByIdEditArea(footerId);
+		if(this.footer == null){
+			var image = this.textEditorInstance.getBasePathImagens("footer.png");
+			this.footer = Builder.node("div", {style: UtilTextEditor.getEstiloSessao(image), title: "Rodapé do texto", id: footerId});
+			this.textEditorInstance.iframeDocument.body.appendChild(this.footer);
+		}
+		this.footer.innerHTML = this.footer.innerHTML+naoEncontrado;
+	}
+};
+
+/**
+ * @class ToolAlignTop
+ */
+var ToolAlignTop = Class.create();
+ToolAlignTop.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * Cabeçalho do documento
+	 * @type HTMLDivElement
+	 */
+	header: null,
+	/**
+	 * colocar o texto selecionado no cabeçalho do documento 
+	 */
+	aplicarFormatacao: function(){
+		var range = new WrapperTextRange(this.textEditorInstance);
+		var naoEncontrado = range.getSelectedHTML();
+		if(naoEncontrado.blank()){
+			return;
+		}
+		range.apagarTexto();
+		var headerID = "header";
+		this.header = this.textEditorInstance.getElementByIdEditArea(headerID);
+		if(this.header == null){
+			var image = this.textEditorInstance.getBasePathImagens("header.png");
+			this.header = Builder.node("div", {style: UtilTextEditor.getEstiloSessao(image), title: "Cabeçalho do texto",id: headerID});
+			var firstChild = this.textEditorInstance.iframeDocument.body.firstChild;
+			if(firstChild == null){
+				this.textEditorInstance.iframeDocument.body.appendChild(this.header);
+			}else{
+				Element.insert(firstChild, {before: this.header});
+			}
+		}
+		this.header.innerHTML = this.header.innerHTML+naoEncontrado;
+	}
+};
+
+/**
+ * Ferramenta para aplicar um link a seleção
+ * @class ToolAplicarLink
+ */
+var ToolAplicarLink = Class.create();
+ToolAplicarLink.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * @type HTMLDivElement
+	 */
+	divConteudo: null,
+	/**
+	 * Abrir a tela para digitar o endereço
+	 * @return
+	 */
+	aplicarFormatacao: function(){
+		if(this.divConteudo != null){
+			return;
+		}
+		var fecharJanela = this.fecharJanela.bind(this);
+		var confirmarAplicarLink = this.confirmarAplicarLink.bind(this);
+		/**
+		 * @type HTMLDivElement
+		 */
+		var divConteudo = UtilTextEditor.getJanelaPadrao("Criar link", 97, 351, confirmarAplicarLink, fecharJanela, this.textEditorInstance);
+		this.divConteudo = $(divConteudo);
+		divConteudo.appendChild(Builder.node("div", [
+			Builder.node("span", {style: "font-weight: bold; color:red; font-size: 9px;", id: "mensagem"}),
+			Builder.node("div", {style: "width: 120px;font-size: 12px; color:gray;float:left;"}, [
+				document.createTextNode("Endereço (URL): ")
+			]),
+			Builder.node("div", [
+				Builder.node("input", {type: "text", id: "url", style: "width: 198px;"})
+			])
+		]));
+	},
+	/**
+	 * Aplicar link a seleção
+	 * @return
+	 */
+	confirmarAplicarLink: function(){
+		var inputUrl = this.divConteudo.select("input[id=\"url\"]").first();
+		var mensagemSpan = this.divConteudo.select("span[id=\"mensagem\"]").first();
+		var url = inputUrl.getValue();
+		if(url.blank()){
+			mensagemSpan.update("É necessário digitar uma URL!");
+			return;
+		}
+		var range = new WrapperTextRange(this.textEditorInstance);
+		if(range.getSelectedText().blank()){
+			mensagemSpan.update("Selecione um texto para aplicar um link!");
+			return;
+		}
+		this.textEditorInstance.executarComando("unlink");
+		this.textEditorInstance.executarComando("createLink", url);
+		this.fecharJanela();
+		this.divConteudo = null;
+	},
+	fecharJanela: function(){
+		this.divConteudo.up().remove();
+		this.divConteudo = null;
+	}
+};
+/**
+ * Ferramenta de edição de HTML
+ * @class ToolEditHTML
+ */
+var ToolEditHTML = Class.create();
+ToolEditHTML.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * @type HTMLSelectElement
+	 */
+	textarea: null,
 	/**
 	 * abrir janela de edição do HTML gerado pelo editor de texto
 	 */
-	aplicarEditHTML: function(){
-		if(this.getJanelaEditHTML() != null){
+	aplicarFormatacao: function(){
+		if(this.textarea != null){
 			return;
 		}
-		var estiloBotoes = "border: 1px solid rgb(144, 186, 237); width: 100px; background-color: #ECF6FF;font-weight: bold; color:#7A7A7A; cursor:pointer;";
-		var botaoOK = Builder.node("input", {type: "button", value: "OK", id:"ok", title: "Copiar o HTML para a janela principal", style: estiloBotoes});
-		var botaoCancelar = Builder.node("input", {type: "button", value: "Cancelar", id: "cancelar", title: "Fechar a janela descartando qualquer alteração", style: estiloBotoes});
-		var botaoAtualizarCodigo = Builder.node("input", {type:"checkbox", style: "height: 15px; vertical-align:middle;", id: "atualizarCodigo"});
-		
-		var imagemMovimentar = Builder.node("img", {
-			height: "16", 
-			width: "16", 
-			src: this.getBasePathImagens("movimentar.png"),
-			style: "float: right; cursor: move;",
-			alt: "Clique aqui e arraste para movimentar a janela",
-			title: "Clique aqui e arraste para movimentar a janela"
+		var botaoAtualizarCodigo = Builder.node("input", {
+			type:"checkbox", 
+			style: "height: 15px; vertical-align:middle;", 
+			id: "atualizarCodigo"
 		});
-		Event.observe(imagemMovimentar, "mousedown", (function(event){
-			if(this.janelaSendoArrastada == null){
-				var divElement = Event.element(event);
-				this.janelaSendoArrastada = new Draggable(divElement.parentNode.parentNode);
-				this.janelaSendoArrastada.initDrag(event);	
-			}			
-		}).bind(this));
-		Event.observe(imagemMovimentar, "mouseup", (function(event){
-			if(this.janelaSendoArrastada != null){
-				this.janelaSendoArrastada.finishDrag(event);
-				this.janelaSendoArrastada.destroy();
-				this.janelaSendoArrastada = null;
-			}
-		}).bind(this));
-		
-		var editHTML = Builder.node("div", {id: "editHTML", style: "position: absolute;top:30px; left: 155px; width: 340px; border: solid 1px gray; background-color: #FBFDFF; z-index: 1000;"},[
-			Builder.node("div", [
-				Builder.node("label", {style: "font-size: 10px;float:left; color:gray;", htmlFor:"atualizarCodigo"}, [
-					botaoAtualizarCodigo,
-					document.createTextNode("atualizar a tela com o código ao digitar")
-				]),
-				imagemMovimentar
+		/**
+		 * @type HTMLDivElement
+		 */
+		var divConteudo = UtilTextEditor.getJanelaPadrao("Editar HTML", 200, 365, this.botaoOK.bind(this), this.botaoCancelar.bind(this), this.textEditorInstance);
+		var textarea=Builder.node("textarea", {style: "width: 339px; border: solid 1px gray;"}, [
+			document.createTextNode(this.textEditorInstance.getHTML())
+		]);
+		this.textarea = textarea;
+		divConteudo.appendChild(Builder.node("div", [
+			Builder.node("label", {style: "font-size: 10px;color:gray;", htmlFor:"atualizarCodigo"}, [
+				botaoAtualizarCodigo,
+				document.createTextNode("atualizar a tela com o código ao digitar")
 			]),
 			Builder.node("div", {style: "text-align: center"}, [
-				Builder.node("textarea", {style: "width: 339px; border-right: none; border-left:none; border-top:none;border-top: solid 1px gray;border-bottom: solid 1px gray;"}, [
-					document.createTextNode(this.getHTML())
-				]),
-			]),
-			Builder.node("div", {style: "text-align: center; margin-bottom: 3px;"}, [
-				botaoOK,
-				document.createTextNode(" "),
-				botaoCancelar
+				textarea,
 			])
-		]);
-		editHTML = $(editHTML);
+		]));
+		divConteudo = $(divConteudo);
 		Event.observe(botaoAtualizarCodigo, "click", this.ativarAtualizarConteudo.bind(this));
-		Event.observe(botaoOK, "click", this.botaoOK.bind(this));
-		Event.observe(botaoCancelar, "click", this.botaoCancelar.bind(this));
-		this.divContainer.appendChild(editHTML);
-		this.divContainer.makePositioned();
 		
-		editHTML.setStyle({
-			left:((this.divContainer.getWidth()-editHTML.getWidth())-5)+ "px" 
+		divConteudo.up().setStyle({
+			left:((this.textEditorInstance.divContainer.getWidth()-divConteudo.up().getWidth())-5)+ "px" 
 		});
-		editHTML.select("textarea")[0].rows = Math.round((this.divContainer.getHeight()-70)/20);
+		
+		this.textarea.rows = Math.round(((this.textEditorInstance.iframeDocument.body.clientHeight)/31))-2;
 	},
 	/**
 	 * Ativar a sincronização do conteúdo HTML da janela de edição do html com 
@@ -956,25 +834,12 @@ TextEditor.prototype = {
 	 */
 	ativarAtualizarConteudo: function(event){
 		var ativar = Event.element(event).checked;
-		var editHTML = this.getJanelaEditHTML();
-		var textArea = $(editHTML).select("textarea")[0];
+		var textArea = this.textarea;
 		if(ativar){
 			Event.observe(textArea, "keyup", this.copiarConteudo.bindAsEventListener(this));
 		}else{
 			Event.stopObserving(textArea, "keyup");
 		}
-	},
-	/**
-	 * retornar a janela de edição do HTML que estiver aberta
-	 * @return a janela de edição do HTML que estiver aberta
-	 * @type HTMLDivElement
-	 */
-	getJanelaEditHTML: function(){
-		var edi = this.divContainer.select("div[id=\"editHTML\"]");
-		if(edi.length != 0){
-			return edi[0];
-		}
-		return null;
 	},
 	/**
 	 * botão cancelar da janela de editHTML
@@ -986,16 +851,16 @@ TextEditor.prototype = {
 	 * fechar a janela sem copiar o html para a tela (Esc) 
 	 */
 	fecharEditHTML: function(){
-		var editHTML = this.getJanelaEditHTML();
-		editHTML.remove();
+		var div = UtilTextEditor.getDivCampo(this.textarea);
+		div.remove();
+		this.textarea = null;
 	},
 	/**
 	 * Copiar o conteúdo da janela de edição do html para o editor
 	 */
 	copiarConteudo: function(){
-		var editHTML = this.getJanelaEditHTML();
-		var html = $(editHTML.select("textarea")[0]).getValue();
-		this.setHTML(html);
+		var html = this.textarea.getValue();
+		this.textEditorInstance.setHTML(html);
 	},
 	/**
 	 * botão ok da janela de edição do HTML
@@ -1003,18 +868,359 @@ TextEditor.prototype = {
 	botaoOK: function(){
 		this.copiarConteudo();
 		this.fecharEditHTML();
+	}
+};
+
+/**
+ * Meta dados das ferramentas
+ * @class MetaDadosFerramentas
+ */
+var MetaDadosFerramentas = Class.create();
+MetaDadosFerramentas.prototype = {
+	/**
+	 * Nome do arquivo que representa o ícone
+	 * @type String
+	 */
+	imageSrc: null,
+	/**
+	 * Comando de formatação
+	 * @type String
+	 */
+	comando: null,
+	/**
+	 * Título dica do botão
+	 * @type String
+	 */
+	titulo: null,
+	/**
+	 * Instância da ferramenta
+	 * @type Object
+	 */
+	toolInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {String} imageSrc
+	 * @param {String} comando
+	 * @param {String} titulo
+	 * @param {Object} toolInstance
+	 * @return
+	 */
+	initialize: function(imageSrc, titulo, comando, toolInstance){
+		this.imageSrc = imageSrc;
+		this.comando = comando;
+		this.titulo = titulo;
+		this.toolInstance = toolInstance;
+	}
+};
+/**
+ * Classe principal
+ * @class TextEditor 
+ */
+var TextEditor = Class.create();
+TextEditor.prototype = {
+
+	/**
+	 * Caminho base onde estão todos os recursos do editor de texto
+	 * @type String
+	 */
+	basePath: null,
+	
+	/**
+	 * id do elemento que representa a editArea
+	 * @type String
+	 */
+	idEditArea: "editAreaElement",
+	
+	/**
+	 * área editável (onde o usuário irá utilizar sua imaginação )
+	 * @type HTMLIFrameElement
+	 */
+	editArea: null,
+	
+	/**
+	 * Objeto documento do iframe
+	 * @type HTMLDocument
+	 */
+	iframeDocument: null,
+	
+	/**
+	 * Onde o text editor foi criado
+	 * @type HTMLDivElement
+	 */
+	divContainer: null,
+	
+	/**
+	 * barra de ferramentas
+	 * @type HTMLDivElement
+	 */
+	barraFerramentas: null,
+	
+	/**
+	 * Tags que deverão ser sempre removidas do texto
+	 * @type Array
+	 */
+	forbiddenTags: null,
+	
+	/**
+	 * Adicionar uma tag não permitida (que deverá ser removida toda vez que aparecer no texto)
+	 * @param {String} tag
+	 * @return
+	 */
+	addNotAllowedTag: function(tag){
+		 if(this.forbiddenTags == null){
+			 this.forbiddenTags = new Array();
+			 this.setListenerEditArea(this.removeTags.bind(this));
+		 }
+		 this.forbiddenTags.push(tag);
 	},
 	/**
-	 * Aplicar uma cor ao texto selecionado
-	 * @param {Event} event
+	 * Função que limpará o texto de tempos em tempos
+	 * @param {HTMLElement} elemento
+	 * @param {String} valor
+	 * @return
 	 */
-	aplicarColor: function(event){
-		var div = Event.element(event);
-		var cor = div.style.backgroundColor;
-		this.aplicarTagTextoSelecionado("span", "style=\"color: "+cor+"\"");
-		this.executarComandoIE("ForeColor", cor);
-		this.mostrarCores();
+	removeTags: function(elemento, valor){
+		this.forbiddenTags.each((function(tag){
+			this.removerTag(elemento, tag);
+		}).bind(this));
 	},
+	/**
+	 * Remover tags do texto, sem remover o conteúdo das mesmas
+	 * @param {HTMLElement} elementoPai
+	 * @param {String} tag
+	 * @return
+	 */
+	removerTag: function(elementoPai, tag){
+		 var dls = $A(elementoPai.getElementsByTagName(tag));
+			
+		 dls.each(function(dl){
+			 var appendNode = dl.parentNode;
+			 var filhos = $A(dl.childNodes);
+			 for ( var index = 0; index < filhos.length; index++) {
+				 var node = filhos[index];
+				 node.parentNode.removeChild(node);
+				 
+				 if(index == 0){
+					 appendNode.replaceChild(node, dl);
+					 appendNode = node;
+				 }else{
+					 Element._insertionTranslations.after(appendNode, node);
+				 }
+			 }
+		});
+	},
+	
+	/**
+	 * recuperar o diretório onde o editor.js está para poder carregar os recursos utilizados
+	 * pelo componente (como imagens dos botões e etc.)
+	 * @return o diretório base onde o text-editor está instalado no webapp 
+	 * @type String
+	 */
+	getBasePath: function(){
+		if(this.basePath == null){
+			$A(document.getElementsByTagName("script")).findAll( (function(s) {
+				if(s.src.indexOf("editor.js") != -1){
+					var src = s.src;
+					this.basePath = src.substring(0, src.indexOf("editor.js"));
+					throw $break;
+				}
+			}).bind(this));			
+		}
+		return this.basePath;
+	},
+	/**
+	 * @constructor
+	 * 
+	 * @param {HTMLDivElement} divContainer elemento onde o text editor deverá ser criado
+	 */
+	initialize: function(divContainer){
+		this.forbiddenTags = null;
+		this.divContainer = $(divContainer);
+		
+		var larguraDivContainer = this.divContainer.getWidth();
+		var alturaDivContainer = this.divContainer.getHeight();
+		
+		$(this.divContainer).setStyle({
+			fontFamily: "Arial",
+			border: "1px solid gray",
+			backgroundColor: "white"
+		});
+		this.configurarBarraFerramentas();
+		/**
+		 * @type HTMLIFrameElement
+		 */
+		var iframe = Builder.node("iframe");
+		iframe.frameBorder = 0;
+		iframe.frameMargin = 0;
+		iframe.framePadding = 0;
+		iframe.width = "100%";
+		iframe.height = alturaDivContainer - this.barraFerramentas.getHeight()-3;
+		iframe.src = "javascript:void(0);";
+		this.editArea = iframe;
+		this.divContainer.appendChild(this.editArea);
+		
+		/**
+		 * @type HTMLDocument
+		 */
+		var iframeDocument = iframe.contentWindow.document;
+		this.iframeDocument = iframeDocument;
+		try {
+			iframeDocument.designMode = "on";
+		} catch ( e ) {
+			// Will fail on Gecko if the editor is placed in an hidden container element
+			// The design mode will be set ones the editor is focused
+			$(iframeDocument).observe("focus", iframeDocument.designMode.bind(iframeDocument));
+		}
+		iframeDocument.open();
+		
+		var iframeContent = "<html><head></head><body style=\"padding:5px\"></body></html>";
+		iframeDocument.write(iframeContent);
+		iframeDocument.close();
+		
+		this.editArea.id = "editArea";
+		try{
+			this.editArea.focus();
+		}catch (e) {
+		}
+		this.posConfiguracaoFerramentas();
+	},
+	/**
+	 * 
+	 * Se firefox retorna {HTMLBodyElement}
+	 * Se IE retorna {HTMLDivElement}
+	 * 
+	 * IMPORTANTE: Observe que o prototype não extend o body, então ele não tem os 
+	 * métodos que os elementos extendidos tem
+	 *  
+	 * @return Retorna a área de edição do do TextEditor
+	 * @type HTMLElement
+	 */
+	getEditArea: function(){
+		return this.editArea;
+	},
+	/**
+	 * @type Form.Element.EditAreaObserver
+	 */
+	editAreaObserver: null,
+	/**
+	 * setar um listener para observar sempre que houver alteração no texto do editor
+	 * @param {Function} callback
+	 */
+	setListenerEditArea: function(callback){
+	 	new PeriodicalExecuter((function(pe){
+			var editArea = this.iframeDocument;
+			if(this.editAreaObserver == null){
+				this.editAreaObserver = new Form.Element.EditAreaObserver(editArea, 0.1, callback);
+			}else{
+				this.editAreaObserver.stop();
+				this.editAreaObserver = new Form.Element.EditAreaObserver(editArea, 0.1, callback);
+			}
+			if(callback == null){
+				this.editAreaObserver.stop();
+				this.editAreaObserver = null;
+			}
+			pe.stop();
+		}).bind(this), 0.2);
+	},
+	
+	/**
+	 * Construir a barra de ferramentas
+	 */
+	configurarBarraFerramentas: function(){
+		this.barraFerramentas = Builder.node("div", {style: "padding-left:4px; margin-top: 3px; border-bottom: solid 1px #E9E9E9; height: 22px; background-color: #FBFDFF"});
+		/**
+		 * @type Array
+		 */
+		var ferramentas = this.getFerramentas();
+		ferramentas.each(this.adicionarBotao.bind(this));
+		
+		this.divContainer.appendChild(this.barraFerramentas);
+		
+		var ultimo=$(this.barraFerramentas.lastChild);
+		if(Prototype.Browser.IE){
+			ultimo.setStyle({styleFloat: "right"});
+		}else{
+			ultimo.setStyle({cssFloat: "right"});
+		}
+	},
+	/**
+	 * Adiciona o botão na barra de ferramentas
+	 * @param {MetaDadosFerramentas} metaDados
+	 */
+	adicionarBotao: function(metaDados){
+		if(metaDados.imageSrc != null && metaDados.titulo != null){
+			var img = this.getImageToolBar(metaDados.imageSrc);
+			var titulo = metaDados.titulo;
+			img.title = titulo;
+			img.alt = titulo;
+			if(metaDados.comando != null){
+				Event.observe(img, "click", this.executarComando.bind(this, metaDados.comando));
+				this.barraFerramentas.appendChild(img);
+			}else{
+				var tool = metaDados.toolInstance;
+				Event.observe(img, "click", tool.aplicarFormatacao.bind(tool));
+			}
+			this.barraFerramentas.appendChild(img);
+		}else{
+			var tool = metaDados.toolInstance;
+			var botaoFerramenta = tool.getElementoTela();
+			var divFerramentas=this.getDivFerramentas(botaoFerramenta);
+			this.barraFerramentas.appendChild(divFerramentas);
+		}
+	},
+	posConfiguracaoFerramentas: function(){
+		//pos configuração de ferramentas, se um dia necessário
+	},
+	/**
+	 * @return array com todos os metadados que representam as ferramentas
+	 * @type Array
+	 */
+	getFerramentas: function(){
+		var metadados = new Array();
+		metadados.push(new MetaDadosFerramentas("text_normal.png", "Retirar a formatação do texto selecionado", "removeFormat"));
+		metadados.push(new MetaDadosFerramentas("text_bold.png", "Negrito", "Bold"));
+		metadados.push(new MetaDadosFerramentas("text_italics.png", "Texto em itálico", "italic"));
+		metadados.push(new MetaDadosFerramentas("text_underlined.png", "Sublinhar o texto", "underline"));
+		metadados.push(new MetaDadosFerramentas("text_align_left.png", "Alinhar a esquerda", "justifyleft"));
+		metadados.push(new MetaDadosFerramentas("text_align_center.png", "Alinhar no centro", "justifycenter"));
+		metadados.push(new MetaDadosFerramentas("text_align_right.png", "Alinhar a direita", "justifyright"));
+		metadados.push(new MetaDadosFerramentas("text_align_justified.png", "Justiticar texto", "justifyfull"));
+		metadados.push(new MetaDadosFerramentas("format-indent-more.png", "Indentar o texto (tabulação)", "indent"));
+		metadados.push(new MetaDadosFerramentas("format-indent-less.png", "Remover indentação", "outdent"));
+		
+		
+		var titulo = "Colocar o texto selecionado no rodapé de todas as páginas (somente para impressão de PDF)";
+		metadados.push(new MetaDadosFerramentas("layout_south.png", titulo, null, new ToolAlignBottom(this)));
+		
+		var tituloCabecalho = "Colocar o texto selecionado no cabeçalho de todas as páginas (somente para impressão de PDF)";
+		metadados.push(new MetaDadosFerramentas("layout_north.png", tituloCabecalho, null,new ToolAlignTop(this)));
+		
+		metadados.push(new MetaDadosFerramentas("link_new.png", "Clique aqui para adicionar um link. " +
+																"Digite o link desejado no campo endereço, " +
+																"Selecione o texto desejado e " +
+																"clique OK para aplicar o link a seleção. ", null, new ToolAplicarLink(this)));
+		metadados.push(new MetaDadosFerramentas("link_delete.png", "Remover o link da seleção", "unlink"));
+		
+		metadados.push(new MetaDadosFerramentas(null, null, null, new ToolColor(this)));
+		metadados.push(new MetaDadosFerramentas(null, null, null, new ToolFormatacao(this)));
+		metadados.push(new MetaDadosFerramentas(null, null, null, new ToolTamanhoFonte(this)));
+		
+		metadados.push(new MetaDadosFerramentas("text-html.png", "Visualizar o código HTML do texto", null, new ToolEditHTML(this)));
+		return metadados;
+	},
+	
+	
+	/**
+	 * 
+	 * @param {String} id
+	 * @return recupera um elemento de dentro da EditArea
+	 * @type HTMLElement
+	 */
+	getElementByIdEditArea: function(id){
+		return this.iframeDocument.getElementById(id);
+	},
+	
 	/**
 	 * html a ser setado no conteúdo
 	 * @type String
@@ -1025,27 +1231,23 @@ TextEditor.prototype = {
 	 * @param {String} html
 	 */
 	setHTML: function(html){
-		this.getEditArea().innerHTML = html;
-		if(Prototype.Browser.Gecko){
-			this.html = html;
-			this.corrigirPathImagens();
-		}
+		this.iframeDocument.body.innerHTML = html;
+		this.html = html;
+		this.corrigirPathImagens();
 	},
 	/**
 	 * Corrigir os paths das imagens adicionando o base href (bug do firefox
 	 * que não reconhece a tag <base href=""> dinamicamente)
 	 */
 	corrigirPathImagens: function(){
-		if(Prototype.Browser.Gecko){
-			var images = $A(this.getEditArea().getElementsByTagName("img"));
-			var path = window.location.href.substring(0, window.location.href.lastIndexOf("/", window.location.href.length)) +"/";
-			
-			images.each(function(image){
-				if(image.src.indexOf(path) == -1){
-					image.src = path+image.src;
-				}
-			});
-		}
+		var images = $A(this.iframeDocument.getElementsByTagName("img"));
+		var path = window.location.href.substring(0, window.location.href.lastIndexOf("/", window.location.href.length)) +"/";
+		
+		images.each(function(image){
+			if(image.src.indexOf(path) == -1){
+				image.src = path+image.src;
+			}
+		});
 	},
 	/**
 	 * retornar texto html produzido pelo usuário
@@ -1053,13 +1255,7 @@ TextEditor.prototype = {
 	 * @type String
 	 */
 	getHTML: function(){
-		if(Prototype.Browser.IE){
-			return this.editArea.innerHTML;
-		}
-		if(Prototype.Browser.Gecko){
-			return this.getEditArea().innerHTML;
-		}
-		return null;
+		return this.iframeDocument.body.innerHTML;
 	},
 	/**
 	 * recuperar o texto sem as tags html
@@ -1070,64 +1266,17 @@ TextEditor.prototype = {
 		return this.getHTML().stripTags();
 	},
 	/**
-	 * Executar um comando do IE
+	 * Executar um comando de formatação ao texto selecionado
 	 * 
 	 * @param {String} comando
 	 * @param {Object} values
 	 */
-	executarComandoIE: function(comando, values){
-		var range = new WrapperTextRange(this.editArea);
-		if(Prototype.Browser.IE && range.getHTMLText() != null && !range.getHTMLText().blank()){
-			if(values != undefined){
-				document.execCommand(comando, false, values);
-			}else{
-				range.execCommand(comando);
-			}
-		}
-	},
-	/**
-	 * aplicar uma tag ao texto selecionado no editor
-	 * 
-	 * @param {String} tag
-	 * @param {String} atributos 
-	 */
-	aplicarTagTextoSelecionado: function(tag, atributos){
-		if(Prototype.Browser.Gecko){
-			var range = new WrapperTextRange(this.editArea);
-			var elemento = null;
-			if(atributos == undefined){
-				elemento = Builder.node(tag);
-			}else{
-				var attrs = this.parseAtributos(atributos);
-				elemento = Builder.node(tag, attrs);
-			}
-			range.surroundContents(elemento);
-		}
-	},
-	/**
-	 * 
-	 * @param {String} atributos
-	 * @return hash com os atributos
-	 * @type Object
-	 */
-	parseAtributos: function(atributos){
-		var attrs = atributos.toQueryParams("\" ");
-		Object.keys(attrs).each(function(key){
-			attrs[key] = attrs[key].replace(/"/g, ""); 
-		});
-		return attrs;
-	},
-	/**
-	 * busca case-insensitive
-	 * 
-	 * @param {String} texto
-	 * @param {String} valorProcurado
-	 * @return verificação do texto conferindo ou não com o valor procurado
-	 * @type Boolean
-	 */
-	_encontrado: function(texto, valorProcurado){
-		var regular = new RegExp(".*"+valorProcurado+".*", "i");
-		return texto.match(regular); 
+	executarComando: function(comando, values){
+		this.editArea.contentWindow.focus();
+		try{
+			this.iframeDocument.execCommand(comando, false, values);
+		}catch(e){/* do nothing */}
+		this.editArea.contentWindow.focus();
 	},
 	/**
 	 * @param {String} src
@@ -1143,7 +1292,7 @@ TextEditor.prototype = {
 	 * @type HTMLDivElement 
 	 */
 	getDivFerramentas: function(encobrir){
-		return Builder.node("div", {style: "margin-left: 5px; float: left; height: 20px;"},[encobrir]);
+		return $(Builder.node("div", {style: "margin-left: 5px; float: left; height: 20px;"},[encobrir]));
 	},
 	/**
 	 * @param {String} src
