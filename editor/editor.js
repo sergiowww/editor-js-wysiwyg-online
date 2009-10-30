@@ -365,6 +365,76 @@ var UtilTextEditor = {
 	}
 };
 /**
+ * Remover formatação
+ */
+var ToolOutdent = Class.create();
+ToolOutdent.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * Aplicar um novo tamanho ao texto selecionado
+	 */
+	aplicarFormatacao: function(){
+		var range = new WrapperTextRange(this.textEditorInstance);
+		var element = range.getSelectedElement();
+		while(element != null && element.id != "indentacao"){
+			element = element.parentNode;
+		}
+		if(element == null){
+			return;
+		}
+		/**
+		 * @type HTMLElement
+		 */
+		var appendElement = element.parentNode;
+		/**
+		 * @type HTMLDivElement
+		 */
+		var elementoRemovido = Element.remove(element);
+		$A(elementoRemovido.childNodes).each(function(childElement){
+			appendElement.appendChild(childElement);
+		});
+	}
+};
+/**
+ * Indentação
+ */
+var ToolIndent = Class.create();
+ToolIndent.prototype = {
+	/**
+	 * @type TextEditor
+	 */
+	textEditorInstance: null,
+	/**
+	 * @constructor
+	 * 
+	 * @param {TextEditor} textEditor
+	 * @return
+	 */
+	initialize: function(textEditor){
+		this.textEditorInstance = textEditor;
+	},
+	/**
+	 * Aplicar um novo tamanho ao texto selecionado
+	 */
+	aplicarFormatacao: function(){
+		var range = new WrapperTextRange(this.textEditorInstance);
+		var htmlSelecionado = range.getSelectedHTML();
+		range.selectionReplaceWith("<div style=\"text-indent: 60px;\" id=\"indentacao\">"+htmlSelecionado+"</div>");
+	}
+};
+/**
  * @class ToolTamanhoFonte
  */
 var ToolTamanhoFonte = Class.create();
@@ -825,7 +895,11 @@ ToolEditHTML.prototype = {
 			left:((this.textEditorInstance.divContainer.getWidth()-divConteudo.up().getWidth())-5)+ "px" 
 		});
 		
-		this.textarea.rows = Math.round(((this.textEditorInstance.iframeDocument.body.clientHeight)/31))-2;
+		var rows = Math.round(((this.textEditorInstance.iframeDocument.body.clientHeight)/31))-2;
+		if(rows <= 0){
+			rows = 1;
+		}
+		this.textarea.rows = rows;
 	},
 	/**
 	 * Ativar a sincronização do conteúdo HTML da janela de edição do html com 
@@ -1186,8 +1260,10 @@ TextEditor.prototype = {
 		metadados.push(new MetaDadosFerramentas("text_align_center.png", "Alinhar no centro", "justifycenter"));
 		metadados.push(new MetaDadosFerramentas("text_align_right.png", "Alinhar a direita", "justifyright"));
 		metadados.push(new MetaDadosFerramentas("text_align_justified.png", "Justiticar texto", "justifyfull"));
-		metadados.push(new MetaDadosFerramentas("format-indent-more.png", "Indentar o texto (tabulação)", "indent"));
+		metadados.push(new MetaDadosFerramentas("format-indent-more.png", "Indentar o texto", "indent"));
 		metadados.push(new MetaDadosFerramentas("format-indent-less.png", "Remover indentação", "outdent"));
+		metadados.push(new MetaDadosFerramentas("format-indent-plus-more.png", "Adicionar parágrafo (tabulação)", null, new ToolIndent(this)));
+		metadados.push(new MetaDadosFerramentas("format-indent-plus-less.png", "Remover parágrafo (tabulação)", null, new ToolOutdent(this)));
 		
 		
 		var titulo = "Colocar o texto selecionado no rodapé de todas as páginas (somente para impressão de PDF)";
