@@ -1,0 +1,1 @@
+Editor JS online for Mozilla Firefox and Internet Explorer based on Prototype JS and Scriptaculous.
