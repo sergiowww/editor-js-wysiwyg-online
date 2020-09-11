@@ -26,3 +26,20 @@ Como no exemplo abaixo:
 </body>
 </html>
 ```
+
+### Online web text-editor Features
+
+- bold;
+- italic;
+- underline;
+- alignment (center, left, right);
+- Font face (Arial, Times, Verdana, Courier New, Comic Sans MS);
+- Font size;
+- Font color;
+- Header and footer (for PDF generation)
+
+Very simple and useful editor, it needs to be improved a lot in terms of features, but it works for basic text-formatting. I've developed to allow users to create formatted e-mail messages and letter templates, not a big deal at all. It works in all browsers.
+
+[Online Live Example](http://sergiowww.github.io/editor-js-wysiwyg-online/)
+
+Generate PDF from HTML http://www.ohloh.net/p/xhtmlrenderer
