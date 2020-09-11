@@ -1093,13 +1093,12 @@ TextEditor.prototype = {
 	 */
 	getBasePath: function(){
 		if(this.basePath == null){
-			$A(document.getElementsByTagName("script")).findAll( (function(s) {
-				if(s.src.indexOf("editor.js") != -1){
-					var src = s.src;
-					this.basePath = src.substring(0, src.indexOf("editor.js"));
-					throw $break;
-				}
-			}).bind(this));			
+			var scriptTag = $A(document.getElementsByTagName("script")).find(function(s) {
+				return s.src.indexOf("editor.js") != -1
+			});
+	
+			var src = scriptTag.src;
+			this.basePath = src.substring(0, src.indexOf("editor.js"));
 		}
 		return this.basePath;
 	},
